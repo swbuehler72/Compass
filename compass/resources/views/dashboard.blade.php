@@ -12,14 +12,14 @@
     <li class="db"><a href="/map/{{ $database->name }}">{{ $database->name }}</a></li>
     @endforeach
     <li>
-      <a href="#" class="pure-button create-link {{ session('create-error') ? 'hidden' : '' }}">create database</a>
-      @if(session('create-error'))
-        <div class="error">{{ session('create-error') }}</div>
+      <a href="#" class="pure-button create-link {{ request()->session()->has('create-error') ? 'hidden' : '' }}">create database</a>
+      @if(request()->session()->has('create-error'))
+        <div class="error">{{ request()->session()->get('create-error') }}</div>
       @endif
-      <span class="create {{ session('create-error') ? '' : 'hidden' }}">
+      <span class="create {{ request()->session()->has('create-error') ? '' : 'hidden' }}">
         <form action="/database/create" method="post" class="ui form">
           <div class="ui action input">
-            <input type="text" name="name" value="{{ session('database-name') }}">
+            <input type="text" name="name" value="{{ request()->session()->get('database-name') }}">
             <button type="submit" class="ui button primary">Create</button>
           </div>
         </form>

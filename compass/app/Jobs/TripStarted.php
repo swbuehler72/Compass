@@ -34,7 +34,7 @@ class TripStarted extends Job implements ShouldQueue
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
           'Content-Type: application/json',
           'Authorization: Bearer '.$db->read_token,
-          'Compass-Url: '.env('BASE_URL').'api/trip?token='.$db->read_token
+          'Compass-Url: '.env('BASE_URL').'/api/trip?token='.$db->read_token
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $trip);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

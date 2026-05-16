@@ -10,7 +10,7 @@ use DB;
 class IndieAuth extends BaseController
 {
   private function _redirectURI() {
-    return env('BASE_URL') . 'auth/callback';
+    return env('BASE_URL') . '/auth/callback';
   }
 
   public function start(Request $request) {
@@ -28,38 +28,45 @@ class IndieAuth extends BaseController
 
     $state = \IndieAuth\Client::generateStateParameter();
 
+    $request->session()->put([
+      'auth_state' => $state, 
+      'attempted_me' => $me,
+    ]);
+
     if(preg_match('/https?:\/\/github\.com\/[^ \/]+/', $me)) {
       $authorizationURL = 'https://github.com/login/oauth/authorize'
         . '?client_id=' . env('GITHUB_ID')
+        . '&redirect_uri=' . urlencode(env('BASE_URL') . '/auth/github')
         . '&state=' . $state;
 
-      session([
-        'auth_state' => $state, 
-        'attempted_me' => $me,
-      ]);
+      $request->session()->save();
 
     } else {
       $authorizationEndpoint = \IndieAuth\Client::discoverAuthorizationEndpoint($me);
 
-      session([
-        'auth_state' => $state, 
-        'attempted_me' => $me,
+      $request->session()->put([
         'authorization_endpoint' => $authorizationEndpoint,
       ]);
+      $request->session()->save();
 
       // If the user specified only an authorization endpoint, use that
       if(!$authorizationEndpoint) {
         // Otherwise, fall back to indieauth.com
         $authorizationEndpoint = env('DEFAULT_AUTH_ENDPOINT');
       }
-      $authorizationURL = \IndieAuth\Client::buildAuthorizationURL($authorizationEndpoint, $me, $this->_redirectURI(), env('BASE_URL'), $state);
+      $authorizationURL = \IndieAuth\Client::buildAuthorizationURL($authorizationEndpoint, [
+        'me' => $me,
+        'redirect_uri' => $this->_redirectURI(),
+        'client_id' => env('BASE_URL'),
+        'state' => $state,
+      ]);
     }
 
     return redirect($authorizationURL);
   }
 
   public function callback(Request $request) {
-    if(!session('auth_state') || !session('attempted_me')) {
+    if(!$request->session()->has('auth_state') || !$request->session()->has('attempted_me')) {
       return view('auth/error', ['error' => 'Missing state information. Start over.']);
     }
 
@@ -67,28 +74,33 @@ class IndieAuth extends BaseController
       return view('auth/error', ['error' => $request->input('error')]);
     }
 
-    if(session('auth_state') != $request->input('state')) {
+    if($request->session()->get('auth_state') != $request->input('state')) {
       return view('auth/error', ['error' => 'State did not match. Start over.']);
     }
 
-    if(session('authorization_endpoint')) {
-      $authorizationEndpoint = session('authorization_endpoint');
+    if($request->session()->has('authorization_endpoint')) {
+      $authorizationEndpoint = $request->session()->get('authorization_endpoint');
     } else {
       $authorizationEndpoint = env('DEFAULT_AUTH_ENDPOINT');
     }
-    $token = \IndieAuth\Client::verifyIndieAuthCode($authorizationEndpoint, $request->input('code'), session('attempted_me'), $this->_redirectURI(), env('BASE_URL'));
+    $result = \IndieAuth\Client::exchangeAuthorizationCode($authorizationEndpoint, [
+      'code' => $request->input('code'),
+      'redirect_uri' => $this->_redirectURI(),
+      'client_id' => env('BASE_URL'),
+    ]);
+    $token = $result['response'];
 
     if($token && array_key_exists('me', $token)) {
-      session()->flush();
-      session(['me' => $token['me']]);
-      $this->_userLoggedIn($token['me']);
+      $request->session()->flush();
+      $request->session()->put(['me' => $token['me']]);
+      $this->_userLoggedIn($request, $token['me']);
     }
 
     return redirect('/');
   }
 
   public function github(Request $request) {
-    if(!session('auth_state') || !session('attempted_me')) {
+    if(!$request->session()->has('auth_state') || !$request->session()->has('attempted_me')) {
       return view('auth/error', ['error' => 'Missing state information. Start over.']);
     }
 
@@ -96,7 +108,7 @@ class IndieAuth extends BaseController
       return view('auth/error', ['error' => $request->input('error')]);
     }
 
-    if(session('auth_state') != $request->input('state')) {
+    if($request->session()->get('auth_state') != $request->input('state')) {
       return view('auth/error', ['error' => 'State did not match. Start over.']);
     }
 
@@ -113,7 +125,7 @@ class IndieAuth extends BaseController
         'client_secret' => env('GITHUB_SECRET'),
         // 'redirect_uri' => env('BASE_URL') . 'auth/github',
         'code' => $request->input('code'),
-        'state' => session('auth_state')
+        'state' => $request->session()->get('auth_state')
       ],
       'headers' => [
         'Accept' => 'application/json'
@@ -134,10 +146,10 @@ class IndieAuth extends BaseController
           if($res->getStatusCode() == 200) {
             $data = json_decode($res->getBody());
             if(property_exists($data, 'login')) {
-              session()->flush();
+              $request->session()->flush();
               $me = 'https://github.com/' . $data->login;
-              session(['me' => $me]);
-              $this->_userLoggedIn($me);
+              $request->session()->put(['me' => $me]);
+              $this->_userLoggedIn($request, $me);
               return redirect('/');
             } else {
               return view('auth/error', ['error' => 'Login failed']);
@@ -160,26 +172,26 @@ class IndieAuth extends BaseController
     }
   }
 
-  private function _userLoggedIn($url) {
+  private function _userLoggedIn(Request $request, $url) {
     // Create the user record if it doesn't exist yet
     $user = DB::table('users')->where('url','=',$url)->first();
     if($user) {
       DB::table('users')->where('id', $user->id)->update([
         'last_login' => date('Y-m-d H:i:s')
       ]);
-      session(['user_id' => $user->id]);
+      $request->session()->put(['user_id' => $user->id]);
     } else {
       $user_id = DB::table('users')->insertGetId([
         'url' => $url,
         'created_at' => date('Y-m-d H:i:s'),
         'last_login' => date('Y-m-d H:i:s'),
       ]);
-      session(['user_id' => $user_id]);
+      $request->session()->put(['user_id' => $user_id]);
     }
   }
 
   public function logout(Request $request) {
-    session()->flush();
+    $request->session()->flush();
     return redirect('/');
   }
 

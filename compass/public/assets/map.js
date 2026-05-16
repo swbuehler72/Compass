@@ -1,4 +1,4 @@
-var map = L.map('map', { zoomControl: false }).setView([45.516, -122.660], 14, null, null, 24);
+var map = L.map('map', { zoomControl: false }).setView([45.516, -122.660], 14);
 
 // var layer = L.esri.basemapLayer("Topographic");
 // layer.maxZoom = 24;
@@ -6,15 +6,11 @@ var map = L.map('map', { zoomControl: false }).setView([45.516, -122.660], 14, n
 // layer.addTo(map);
 
 var opts = {
-  attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-  maxZoom: 24,
-  zoomOffset: -1,
-  tileSize: 512,
-  id: 'mapbox/light-v10',
-  accessToken: 'pk.eyJ1IjoiYWFyb25wayIsImEiOiJja3A0eXV2ZXIwMGt3MnVuc2Uzcm1yYzFuIn0.-_qwPOLRiQk8t56xs6vkfg'
+  attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+  maxZoom: 19
 };
 
-L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', opts).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', opts).addTo(map);
 
 new L.Control.Zoom({ position: 'topleft' }).addTo(map);
 

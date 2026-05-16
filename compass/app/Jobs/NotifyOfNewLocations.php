@@ -34,7 +34,7 @@ class NotifyOfNewLocations extends Job implements ShouldQueue
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
           'Content-Type: application/json',
           'Authorization: Bearer '.$db->read_token,
-          'Compass-Url: '.env('BASE_URL').'api/last?token='.$db->read_token.'&geocode=1'
+          'Compass-Url: '.env('BASE_URL').'/api/last?token='.$db->read_token.'&geocode=1'
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $location);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

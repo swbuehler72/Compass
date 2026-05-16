@@ -86,8 +86,10 @@ $app->middleware([
 // $app->register(App\Providers\AppServiceProvider::class);
 // $app->register(App\Providers\EventServiceProvider::class);
 $app->configure('session');
+$app->configure('database');
 $app->register(Illuminate\Cookie\CookieServiceProvider::class);
 $app->register(Illuminate\Session\SessionServiceProvider::class);
+$app->register(Illuminate\Redis\RedisServiceProvider::class);
 $app->bind(\Illuminate\Contracts\Cookie\QueueingFactory::class, 'cookie');
 
 /*

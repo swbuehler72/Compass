@@ -15,7 +15,7 @@
       <input readonly="" value="{{ $database->read_token }}">
     </div>
 
-    @if ($database->created_by == session('user_id'))
+    @if ($database->created_by == request()->session()->get('user_id'))
     <div class="field">
       <label>Write Token <a href="#" class="show-api-endpoint">(show API endpoint)</a></label>
       <input readonly="" value="{{ $database->write_token }}">
@@ -23,7 +23,7 @@
 
     <div class="api-endpoint field hidden">
       <label>API Endpoint</label>
-      <input type="text" readonly value="{{ env('BASE_URL') }}api/input?token={{ $database->write_token }}">
+      <input type="text" readonly value="{{ env('BASE_URL') }}/api/input?token={{ $database->write_token }}">
     </div>
     @endif
   </form>
@@ -34,21 +34,21 @@
     <ul class="users">
       @foreach($users as $user)
       <li class="user">
-        @if($user->id != session('user_id'))
+        @if($user->id != request()->session()->get('user_id'))
           <a href="#" data-user="{{ $user->url }}" class="remove-user hidden">&times;</a>
         @endif
         {{ $user->url }}
       </li>
       @endforeach
       <li>
-        <a href="javascript:$('.users .create').removeClass('hidden');$('.create-link').addClass('hidden');" class="pure-button create-link {{ session('create-error') ? 'hidden' : '' }}">New User</a>
-        @if(session('create-error'))
-          <div class="error">{{ session('create-error') }}</div>
+        <a href="javascript:$('.users .create').removeClass('hidden');$('.create-link').addClass('hidden');" class="pure-button create-link {{ request()->session()->has('create-error') ? 'hidden' : '' }}">New User</a>
+        @if(request()->session()->has('create-error'))
+          <div class="error">{{ request()->session()->get('create-error') }}</div>
         @endif
-        <span class="create {{ session('create-error') ? '' : 'hidden' }}">
+        <span class="create {{ request()->session()->has('create-error') ? '' : 'hidden' }}">
           <form action="/settings/{{ $database->name }}" method="post" class="ui form">
             <div class="ui action input">
-              <input type="url" name="add_user" value="{{ session('add-user-url') }}" placeholder="github or indieauth url">
+              <input type="url" name="add_user" value="{{ request()->session()->get('add-user-url') }}" placeholder="github or indieauth url">
               <button type="submit" class="ui button primary">Add User</button>
             </div>
           </form>

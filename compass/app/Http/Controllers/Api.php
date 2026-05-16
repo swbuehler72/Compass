@@ -434,7 +434,7 @@ class Api extends BaseController
       return response(json_encode(['error' => 'invalid token']))->header('Content-Type', 'application/json');
 
     $expires_at = time() + $request->input('duration');
-    $share_token = str_random(15);
+    $share_token = \Illuminate\Support\Str::random(15);
 
     $share_id = DB::table('shares')->insertGetId([
       'database_id' => $db->id,
@@ -443,7 +443,7 @@ class Api extends BaseController
       'token' => $share_token,
     ]);
 
-    $share_url = env('BASE_URL').'s/'.$share_token;
+    $share_url = env('BASE_URL').'/s/'.$share_token;
 
     return response(json_encode([
       'url' => $share_url

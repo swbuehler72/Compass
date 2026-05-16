@@ -8,21 +8,22 @@ use DB;
 
 class Controller extends BaseController
 {
-  private static function displayURL() {
-    return preg_replace('/(^https?:\/\/|\/$)/', '', session('me'));
+  private static function displayURL(Request $request) {
+    $me = $request->session()->get('me') ?: '';
+    return preg_replace('/(^https?:\/\/|\/$)/', '', $me);
   }
 
   public function index(Request $request) {
-    if(session('user_id')) {
+    if($request->session()->has('user_id')) {
 
       $databases = DB::select('SELECT d.*
         FROM `databases` d
         JOIN database_users u ON d.id = u.database_id
         WHERE u.user_id = ?
-        ORDER BY name', [session('user_id')]);
+        ORDER BY name', [$request->session()->get('user_id')]);
 
       return view('dashboard', [
-        'displayURL' => self::displayURL(),
+        'displayURL' => self::displayURL($request),
         'databases' => $databases
       ]);
     } else {
@@ -31,7 +32,7 @@ class Controller extends BaseController
   }
 
   public function createDatabase(Request $request) {
-    if(!session('user_id'))
+    if(!$request->session()->has('user_id'))
       return redirect('/');
 
     if($request->input('name') == '') {
@@ -53,14 +54,17 @@ class Controller extends BaseController
       // Create the database records
       $id = DB::table('databases')->insertGetId([
         'name' => $request->input('name'),
-        'read_token' => str_random(40),
-        'write_token' => str_random(40),
-        'created_by' => session('user_id'),
-        'created_at' => date('Y-m-d H:i:s')
+        'read_token' => \Illuminate\Support\Str::random(40),
+        'write_token' => \Illuminate\Support\Str::random(40),
+        'created_by' => $request->session()->get('user_id'),
+        'created_at' => date('Y-m-d H:i:s'),
+        'micropub_endpoint' => '',
+        'micropub_token' => '',
+        'ping_urls' => '',
       ]);
       DB::table('database_users')->insert([
         'database_id' => $id,
-        'user_id' => session('user_id'),
+        'user_id' => $request->session()->get('user_id'),
         'created_at' => date('Y-m-d H:i:s')
       ]);
       return redirect('/');
@@ -73,7 +77,7 @@ class Controller extends BaseController
   }
 
   public function map(Request $request, $name) {
-    if(!session('user_id'))
+    if(!$request->session()->has('user_id'))
       return redirect('/');
 
     // Verify this user has access to the database
@@ -81,7 +85,7 @@ class Controller extends BaseController
       ->join('database_users', function($join){
         $join->on('databases.id','=','database_users.database_id');
       })
-      ->where('user_id','=',session('user_id'))
+      ->where('user_id','=',$request->session()->get('user_id'))
       ->where('name','=',$name)
       ->first();
     if(!$db)
@@ -89,7 +93,7 @@ class Controller extends BaseController
 
 
     return view('map', [
-      'displayURL' => self::displayURL(),
+      'displayURL' => self::displayURL($request),
       'database' => $db,
       'menu' => [
         '/settings/'.$name => 'Settings'
@@ -101,12 +105,12 @@ class Controller extends BaseController
   }
 
   public function settings(Request $request, $name) {
-    if(!session('user_id'))
+    if(!$request->session()->has('user_id'))
       return redirect('/');
 
     // Only the person that created the database can modify it
     $db = DB::table('databases')
-      ->where('created_by','=',session('user_id'))
+      ->where('created_by','=',$request->session()->get('user_id'))
       ->where('name','=',$name)
       ->first();
     if(!$db)
@@ -119,7 +123,7 @@ class Controller extends BaseController
       ORDER BY u.url', [$db->id]);
 
     return view('settings', [
-      'displayURL' => self::displayURL(),
+      'displayURL' => self::displayURL($request),
       'database' => $db,
       'users' => $users,
       'menu' => [
@@ -129,12 +133,12 @@ class Controller extends BaseController
   }
 
   public function updateSettings(Request $request, $name) {
-    if(!session('user_id'))
+    if(!$request->session()->has('user_id'))
       return redirect('/');
 
     // Only the person that created the database can modify it
     $db = DB::table('databases')
-      ->where('created_by','=',session('user_id'))
+      ->where('created_by','=',$request->session()->get('user_id'))
       ->where('name','=',$name)
       ->first();
     if(!$db)
@@ -191,13 +195,15 @@ class Controller extends BaseController
       return redirect('/settings/'.$db->name);
     } else if($request->input('timezone')) {
       DB::table('databases')->where('id', $db->id)
-	->update([
-	  'timezone' => $request->input('timezone'),
+	    ->update([
+	      'timezone' => $request->input('timezone'),
           'metric' => $request->input('metric'),
         ]);
 
       return redirect('/settings/'.$db->name);
     }
+
+    return redirect('/settings/'.$db->name);
   }
 
     public function micropubStart(Request $request, $dbName) {
@@ -216,23 +222,30 @@ class Controller extends BaseController
         }
 
         // Isolate session variables to this variable only
-        session([$dbName => [
+        $request->session()->put([$dbName => [
             'auth_state' => $state,
             'attempted_me' => $me,
             'authorization_endpoint' => $authorizationEndpoint
         ]]);
+        $request->session()->save();
 
-        $authorizationURL = \IndieAuth\Client::buildAuthorizationURL($authorizationEndpoint, $me, $this->_databaseRedirectURI($dbName), env('BASE_URL'), $state, 'create');
+        $authorizationURL = \IndieAuth\Client::buildAuthorizationURL($authorizationEndpoint, [
+            'me' => $me,
+            'redirect_uri' => $this->_databaseRedirectURI($dbName),
+            'client_id' => env('BASE_URL'),
+            'state' => $state,
+            'scope' => 'create',
+        ]);
 
         return redirect($authorizationURL);
     }
 
     public function micropubCallback(Request $request, $dbName) {
 
-        $settingsSession = session($dbName);
+        $settingsSession = $request->session()->get($dbName);
 
         // Start all error checking
-        if(!$settingsSession['auth_state'] || !$settingsSession['attempted_me']) {
+        if(!$settingsSession || !$settingsSession['auth_state'] || !$settingsSession['attempted_me']) {
             return view('auth/error', ['error' => 'Missing state information. Start over.']);
         }
 
@@ -262,11 +275,16 @@ class Controller extends BaseController
             return view('auth/error', ['error' => 'Could not find user\'s token endpoint']);
         }
 
-        $token = \IndieAuth\Client::getAccessToken($tokenEndpoint, $request->input('code'), $settingsSession['attempted_me'], $this->_databaseRedirectURI($dbName), env('BASE_URL'));
+        $result = \IndieAuth\Client::exchangeAuthorizationCode($tokenEndpoint, [
+            'code' => $request->input('code'),
+            'redirect_uri' => $this->_databaseRedirectURI($dbName),
+            'client_id' => env('BASE_URL'),
+        ]);
+        $token = $result['response'];
 
         if($token && array_key_exists('me', $token)) {
             // forget the current db settings session
-            session()->forget($dbName);
+            $request->session()->forget($dbName);
 
             if (!array_key_exists('access_token', $token)) {
                 return view('auth/error', ['error' => 'Could not find access_token']);
@@ -311,7 +329,7 @@ class Controller extends BaseController
     }
 
     private function _databaseRedirectURI($dbName) {
-        return env('BASE_URL') . 'settings/' . $dbName . '/auth/callback';
+        return env('BASE_URL') . '/settings/' . $dbName . '/auth/callback';
     }
 
 }
