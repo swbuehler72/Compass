@@ -6,11 +6,10 @@ use Log;
 use Quartz;
 use p3k\Multipart;
 use App\Jobs\Job;
-use Illuminate\Contracts\Bus\SelfHandling;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use DateTime, DateTimeZone;
 
-class TripComplete extends Job implements SelfHandling, ShouldQueue
+class TripComplete extends Job implements ShouldQueue
 {
   private $_dbid;
   private $_data;

@@ -1,8 +1,13 @@
 <?php
 
 require_once __DIR__.'/../vendor/autoload.php';
+require_once __DIR__.'/../app/helpers.php';
 
-Dotenv::load(__DIR__.'/../');
+try {
+    (Dotenv\Dotenv::createUnsafeImmutable(__DIR__.'/../'))->load();
+} catch (Dotenv\Exception\InvalidPathException $e) {
+    //
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -80,6 +85,10 @@ $app->middleware([
 
 // $app->register(App\Providers\AppServiceProvider::class);
 // $app->register(App\Providers\EventServiceProvider::class);
+$app->configure('session');
+$app->register(Illuminate\Cookie\CookieServiceProvider::class);
+$app->register(Illuminate\Session\SessionServiceProvider::class);
+$app->bind(\Illuminate\Contracts\Cookie\QueueingFactory::class, 'cookie');
 
 /*
 |--------------------------------------------------------------------------
@@ -92,7 +101,9 @@ $app->middleware([
 |
 */
 
-$app->group(['namespace' => 'App\Http\Controllers'], function ($app) {
+$app->router->group([
+    'namespace' => 'App\Http\Controllers',
+], function ($router) {
     require __DIR__.'/../app/Http/routes.php';
 });
 

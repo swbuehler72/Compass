@@ -9,7 +9,13 @@ class ExampleTest extends TestCase
      */
     public function testBasicExample()
     {
-        $this->visit('/')
-             ->see('Lumen.');
+        $this->get('/');
+        
+        if ($this->response->getStatusCode() !== 200) {
+            echo $this->response->getContent();
+        }
+        
+        $this->assertEquals(200, $this->response->getStatusCode());
+        $this->assertStringContainsString('Compass', $this->response->getContent());
     }
 }

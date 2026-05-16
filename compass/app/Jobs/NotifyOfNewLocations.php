@@ -3,11 +3,10 @@ namespace App\Jobs;
 
 use DB, Log;
 use App\Jobs\Job;
-use Illuminate\Contracts\Bus\SelfHandling;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use DateTime, DateTimeZone;
 
-class NotifyOfNewLocations extends Job implements SelfHandling, ShouldQueue
+class NotifyOfNewLocations extends Job implements ShouldQueue
 {
   private $_dbid;
 
